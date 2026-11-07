@@ -1,0 +1,19 @@
+{
+  "profile": "HEALDATA-9312 research v0.2",
+  "cases": [
+    {"file":"minimum.bin","date":"20010203","points":1,"samples":1,"events":0,"first_raw":0,"last_raw":0,"last_time":"2001-02-03T09:00:00"},
+    {"file":"clock.bin","date":"20010203","points":5,"samples":4,"events":3,"first_raw":71,"last_raw":95,"last_time":"2001-02-04T08:59:00","check_clock":true},
+    {"file":"next-day.bin","date":"20010204","points":1,"samples":1,"events":0,"first_raw":0,"last_raw":0,"last_time":"2001-02-04T09:00:00"},
+    {"file":"at-capacity.bin","date":"20010203","points":400,"samples":290,"events":150,"first_raw":30,"last_raw":429,"last_time":"2001-02-03T15:39:00"},
+    {"file":"truncated.bin","date":"20010203","error":"unsupported length"},
+    {"file":"bad-count.bin","date":"20010203","error":"pressure count"},
+    {"file":"bad-event-count.bin","date":"20010203","error":"event count"},
+    {"file":"bad-channel-count.bin","date":"20010203","error":"invalid channel count"},
+    {"file":"bad-clock.bin","date":"20010203","error":"time outside report day"},
+    {"file":"bad-date.bin","date":"20010203","error":"month"},
+    {"file":"counter-mismatch.bin","date":"20010203","error":"event counter mismatch"},
+    {"file":"nan.bin","date":"20010203","error":"non-finite float"},
+    {"file":"foreign-zero.bin","date":"20010203","error":"year"},
+    {"file":"unobserved-empty.bin","date":"20010203","error":"pressure count"}
+  ]
+}

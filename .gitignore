@@ -1,0 +1,39 @@
+# Personal device recordings and reports stay local.
+/data/private/
+/work/
+/healdata
+# Third-party executable packages are not project source.
+/vendor/
+/research/vendor-analysis/
+# Local interpreter/editor/build artifacts.
+__pycache__/
+*.py[cod]
+.venv/
+.DS_Store
+.env
+.env.*
+!.env.example
+
+# Локальные материалы исследования и тесты, зависящие от личных выгрузок.
+/data/
+/docs/ROADMAP.md
+/docs/research/
+/docs/superpowers/
+/research/format-notes-v0.1.txt
+/research/prototype/
+/research/stage1/*
+!/research/stage1/make_fixtures.py
+/corpus_test.go
+/internal/cli/corpus_test.go
+
+# Выгрузки аппарата, отчёты и локальные сборки.
+/HealData/
+/report-csv/
+/report.json
+*.zip
+*.csv
+# Синтетические примеры уже отслеживаются Git. Новые двоичные записи игнорируются.
+*.bin
+[0-9][0-9][0-9][0-9][0-9][0-9][0-9][0-9]
+ID.txt
+*.exe
