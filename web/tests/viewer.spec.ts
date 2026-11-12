@@ -447,10 +447,7 @@ test("simple sleep session spans 09:00 and separates the next evening", async ({
   await expect(page.locator("#sleep-stats")).toContainText("10 ч 40 мин");
   await expect(page.locator("#sleep-stats dd").last()).toContainText("—");
   await expect(page.locator("#session-charts canvas")).toBeVisible();
-  await expect(page.locator("#session-charts")).toHaveCSS("height", "395px");
-  await page.locator("#session-more").click();
   await expect(page.locator("#session-charts")).toHaveCSS("height", "1235px");
-  await page.locator("#session-more").click();
   await page.locator("#technical > summary").click();
   await page.locator("#session-gap").fill("1");
   await page.getByRole("button", { name: "Применить", exact: true }).click();

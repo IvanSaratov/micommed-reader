@@ -36,16 +36,11 @@ export class SessionScreen {
   private charts?: DayCharts;
   private generation = 0;
   private detailRequest = 0;
-  private full = false;
   constructor() {
     el<HTMLSelectElement>("sleep-select").onchange = () =>
       void this.select(Number(el<HTMLSelectElement>("sleep-select").value));
     button("session-prev").onclick = () => this.move(-1);
     button("session-next").onclick = () => this.move(1);
-    button("session-more").onclick = () => {
-      this.full = !this.full;
-      this.draw();
-    };
     button("session-reset").onclick = () => this.charts?.reset();
     el("session-settings").onsubmit = (e) => {
       e.preventDefault();
@@ -63,7 +58,6 @@ export class SessionScreen {
     this.reader = undefined;
     this.index = undefined;
     this.data = undefined;
-    this.full = false;
     this.charts?.clear();
     for (const id of [
       "sleep-select",
@@ -205,13 +199,8 @@ export class SessionScreen {
   }
   private draw() {
     if (!this.data) return;
-    button("session-more").textContent = this.full
-      ? "Только давление и события"
-      : "Другие графики";
-    button("session-more").setAttribute("aria-pressed", String(this.full));
     this.charts ||= new DayCharts(el("session-charts"));
     this.charts.show(this.data, {
-      overview: !this.full,
       simple: true,
       origin: this.data.start_device_time,
       span: this.data.span_minutes,

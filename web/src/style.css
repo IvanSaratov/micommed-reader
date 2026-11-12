@@ -761,7 +761,7 @@ footer {
 }
 .sleep-chart-actions {
   display: flex;
-  justify-content: space-between;
+  justify-content: flex-end;
   margin: 20px 0;
 }
 .sleep-chart-actions button {
@@ -775,7 +775,7 @@ footer {
 }
 #session-charts {
   position: relative;
-  height: 395px;
+  height: 1235px;
   width: 100%;
 }
 .technical {

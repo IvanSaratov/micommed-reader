@@ -67,7 +67,7 @@ export function tooltipText(
   day: PlotData,
   minute: number,
   simple = false,
-  options: { origin?: string; channels?: boolean } = {},
+  options: { origin?: string } = {},
 ) {
   const lines: string[] = [];
   const pressure = day.pressure.filter((p) => p.minute === minute);
@@ -78,7 +78,7 @@ export function tooltipText(
         : `${day.fields.pressure_1?.Label || "pressure_1 / pressure_2"} · #${p.source_index ?? p.index}: ${number.format(p.first_raw * day.pressure_fields[0].scale)} / ${number.format(p.second_raw * day.pressure_fields[1].scale)} ${day.pressure_fields[0].unit} (отсчёты ${p.first_raw}, ${p.second_raw}; ${day.pressure_fields[0].meaning_evidence})`,
     );
   }
-  for (const ch of options.channels === false ? [] : day.channels) {
+  for (const ch of day.channels) {
     for (const p of ch.points.filter((p) => p.minute === minute)) {
       lines.push(
         simple
@@ -117,7 +117,6 @@ export class DayCharts {
   private day: PlotData | undefined;
   private simple = false;
   private origin?: string;
-  private overview = false;
   private axisCount = 7;
   private tooltip = document.createElement("div");
   constructor(private element: HTMLElement) {
@@ -146,7 +145,6 @@ export class DayCharts {
       );
       this.tooltip.textContent = tooltipText(this.day, minute, this.simple, {
         origin: this.origin,
-        channels: !this.overview,
       });
       this.tooltip.hidden = !this.tooltip.textContent;
       if (this.tooltip.hidden) return;
@@ -177,7 +175,6 @@ export class DayCharts {
   show(
     day: PlotData,
     options: {
-      overview?: boolean;
       origin?: string;
       span?: number;
       simple?: boolean;
@@ -187,9 +184,7 @@ export class DayCharts {
     this.tooltip.hidden = true;
     this.simple = options.simple || false;
     this.origin = options.origin;
-    this.overview = options.overview || false;
-    const visible = options.overview ? [0, 6] : [0, 1, 2, 3, 4, 5, 6];
-    const allAxes = visible.map((_, i) => i);
+    const allAxes = [0, 1, 2, 3, 4, 5, 6];
     this.axisCount = allAxes.length;
     this.element.style.height = 168 * allAxes.length + 59 + "px";
     this.chart.resize();
@@ -229,9 +224,9 @@ export class DayCharts {
         type: "line" as const,
         xAxisIndex: 0,
         yAxisIndex: 0,
-        symbol: axis ? "diamond" : "circle",
-        symbolSize: axis ? 6 : 5,
-        showSymbol: true,
+        // Плотные измерения читаются как линия; маркеры не перекрывают соседние значения.
+        symbol: "none",
+        showSymbol: false,
         connectNulls: false,
         smooth: false,
         lineStyle: { width: 1.4 },
@@ -251,34 +246,31 @@ export class DayCharts {
           day.pressure_fields[axis].scale,
         ),
       })),
-      ...(options.overview
-        ? []
-        : day.channels.map((ch, i) => ({
-            name: ch.field,
-            type: "line" as const,
-            xAxisIndex: i + 1,
-            yAxisIndex: i + 1,
-            data: channelData(
-              ch.points,
-              new Set(
-                day.diagnostics
-                  .filter(
-                    (d) =>
-                      d.field === ch.field &&
-                      ["sample_gap", "time_reversal"].includes(d.code),
-                  )
-                  .map((d) => d.index!),
-              ),
-              ch.scale,
-            ),
-            symbol: "circle",
-            symbolSize: 4,
-            showSymbol: true,
-            connectNulls: false,
-            smooth: false,
-            lineStyle: { width: 1.4 },
-            itemStyle: { color: colors[i + 2] },
-          }))),
+      ...day.channels.map((ch, i) => ({
+        name: ch.field,
+        type: "line" as const,
+        xAxisIndex: i + 1,
+        yAxisIndex: i + 1,
+        data: channelData(
+          ch.points,
+          new Set(
+            day.diagnostics
+              .filter(
+                (d) =>
+                  d.field === ch.field &&
+                  ["sample_gap", "time_reversal"].includes(d.code),
+              )
+              .map((d) => d.index!),
+          ),
+          ch.scale,
+        ),
+        symbol: "none",
+        showSymbol: false,
+        connectNulls: false,
+        smooth: false,
+        lineStyle: { width: 1.4 },
+        itemStyle: { color: colors[i + 2] },
+      })),
       {
         name: "События",
         type: "scatter",
@@ -297,13 +289,12 @@ export class DayCharts {
     const option: EChartsOption = {
       animation: false,
       textStyle: { fontFamily: "Inter Variable, sans-serif", color: "#617168" },
-      title: visible.map((original, i) => ({
-        text: titles[original],
+      title: allAxes.map((i) => ({
+        text: titles[i],
         subtext:
-          original === 6 && this.simple
+          i === 6 && this.simple
             ? ""
-            : units[original] ||
-              (original === 6 ? "Код события" : "Исходные значения"),
+            : units[i] || (i === 6 ? "Код события" : "Исходные значения"),
         left: 0,
         top: i * 168 + 4,
         textStyle: { fontSize: 12, fontWeight: 500, color: "#25362e" },
