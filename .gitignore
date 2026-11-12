@@ -37,3 +37,11 @@ __pycache__/
 [0-9][0-9][0-9][0-9][0-9][0-9][0-9][0-9]
 ID.txt
 *.exe
+
+# Результаты сборки и браузерных проверок сайта.
+/web/node_modules/
+/web/dist/
+/web/public/wasm/
+/web/public/THIRD-PARTY-NOTICES.txt
+/web/test-results/
+/web/playwright-report/

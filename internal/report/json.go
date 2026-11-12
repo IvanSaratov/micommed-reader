@@ -1,4 +1,4 @@
-package cli
+package report
 
 import (
 	"bufio"
@@ -6,7 +6,7 @@ import (
 	"io"
 )
 
-func (r *report) writeJSON(dst io.Writer) error {
+func (r *Report) WriteJSON(dst io.Writer) error {
 	// Записываем дни по одному, чтобы размер архива не определял размер временной JSON-модели.
 	w := bufio.NewWriter(dst)
 	enc := json.NewEncoder(w)

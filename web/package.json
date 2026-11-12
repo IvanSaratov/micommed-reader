@@ -1,0 +1,23 @@
+{
+  "name": "healdata-web",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "wasm": "node scripts/build-wasm.mjs",
+    "dev": "npm run wasm && vite --host 127.0.0.1",
+    "build": "npm run wasm && tsc --noEmit && vite build && node scripts/check-dist.mjs",
+    "preview": "vite preview --host 127.0.0.1",
+    "test": "playwright test"
+  },
+  "dependencies": {
+    "@fontsource-variable/inter": "^5.2.8",
+    "echarts": "6.1.0"
+  },
+  "devDependencies": {
+    "@playwright/test": "1.65.0",
+    "fflate": "^0.8.3",
+    "typescript": "7.0.2",
+    "vite": "8.3.8"
+  }
+}

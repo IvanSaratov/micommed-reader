@@ -1,0 +1,260 @@
+<!doctype html>
+<html lang="ru">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="theme-color" content="#f7f8f5" />
+    <meta
+      name="description"
+      content="Просмотр дневных записей RC-C60 на вашем устройстве. Сводка, графики и экспорт."
+    />
+    <title>HEALDATA — записи RC-C60</title>
+  </head>
+  <body>
+    <div id="app">
+      <header class="app-header">
+        <a href="./" class="brand" aria-label="HEALDATA, начало"
+          ><span class="brand-mark" aria-hidden="true">h</span>healdata<span
+            class="brand-model"
+            >RC-C60</span
+          ></a
+        >
+        <span class="local-note">Обработка на этом устройстве</span>
+        <button id="open" class="primary">Открыть файлы</button>
+        <input
+          id="files"
+          type="file"
+          multiple
+          hidden
+          aria-label="Выбрать записи"
+        />
+      </header>
+      <main>
+        <section id="empty" class="empty" aria-labelledby="empty-title">
+          <h1 id="empty-title">
+            Ваша запись.<br /><span>Каждая минута.</span>
+          </h1>
+          <p>
+            Откройте выгрузку с аппарата,<br />чтобы посмотреть, как прошла
+            ночь.
+          </p>
+          <div id="drop" class="drop-zone">
+            <button id="choose" class="primary">Выбрать файл или ZIP</button>
+            <p>или перетащите сюда дневные файлы</p>
+          </div>
+          <p class="empty-foot">Запись остаётся в памяти этой вкладки.</p>
+        </section>
+        <section id="date-request" class="date-request" hidden>
+          <h2>Дата отчётного дня</h2>
+          <p id="date-explanation"></p>
+          <form id="date-form">
+            <label>Дата<input id="file-date" type="date" required /></label
+            ><button class="primary">Открыть запись</button
+            ><button type="button" id="date-cancel">Отмена</button>
+          </form>
+        </section>
+        <section id="loading" class="loading" hidden aria-live="polite">
+          <p id="progress-label">Подготовка к чтению…</p>
+          <progress id="progress"></progress
+          ><button id="cancel">Отменить</button>
+        </section>
+        <div id="error" class="error" role="alert" hidden></div>
+        <div id="workspace" class="viewer" hidden>
+          <section id="sleep-view" class="sleep-view" aria-label="Сеанс сна">
+            <div class="sleep-navigation">
+              <label>Сеанс сна<select id="sleep-select"></select></label>
+              <button id="session-prev" aria-label="Предыдущий сеанс">←</button>
+              <button id="session-next" aria-label="Следующий сеанс">→</button>
+              <button id="close-session" class="quiet">Закрыть</button>
+            </div>
+            <p id="session-warning" class="session-warning" hidden>
+              Часть записей требует проверки.
+              <button id="show-issues">Посмотреть</button>
+            </p>
+            <p id="sleep-empty" hidden>
+              Не удалось собрать сеансы. Откройте подробности, чтобы посмотреть
+              доступные записи.
+            </p>
+            <div id="sleep-result" hidden>
+              <h1 id="sleep-title"></h1>
+              <p id="sleep-time" class="sleep-time"></p>
+              <dl id="sleep-stats" class="day-stats"></dl>
+              <div class="sleep-chart-actions">
+                <button id="session-more" aria-pressed="false">
+                  Другие графики</button
+                ><button id="session-reset">Весь сеанс</button>
+              </div>
+              <div id="session-charts" aria-label="Графики сеанса"></div>
+            </div>
+            <p id="session-error" role="alert" hidden></p>
+          </section>
+          <details id="technical" class="technical">
+            <summary>Подробности</summary>
+            <form id="session-settings" class="session-settings">
+              <label
+                >Объединять записи с перерывом до<input
+                  id="session-gap"
+                  type="number"
+                  min="1"
+                  max="240"
+                  step="1"
+                  value="60"
+                  required
+                  aria-label="Перерыв между записями, минут" /></label
+              ><span>минут</span><button>Применить</button>
+              <p>
+                Сеансы строятся по записям аппарата. Короткие перерывы остаются
+                видны на графике. Ниже — исходные сутки, показатели и экспорт.
+              </p>
+            </form>
+            <div class="technical-grid">
+              <aside class="sidebar">
+                <div class="source-heading">
+                  <span>Открытая выгрузка</span
+                  ><button id="close" aria-label="Закрыть выгрузку">
+                    Закрыть
+                  </button>
+                </div>
+                <p id="source-name" class="source-name"></p>
+                <div class="calendar-nav">
+                  <button id="month-prev" aria-label="Предыдущий месяц">
+                    ‹
+                  </button>
+                  <h2 id="month-title"></h2>
+                  <button id="month-next" aria-label="Следующий месяц">
+                    ›
+                  </button>
+                </div>
+                <div class="weekdays" aria-hidden="true">
+                  <span>Пн</span><span>Вт</span><span>Ср</span><span>Чт</span
+                  ><span>Пт</span><span>Сб</span><span>Вс</span>
+                </div>
+                <div
+                  id="calendar"
+                  class="calendar"
+                  aria-label="Дни с записями"
+                ></div>
+                <div class="day-navigation">
+                  <button id="day-prev">Предыдущая запись</button
+                  ><button id="day-next">Следующая</button>
+                </div>
+                <p id="coverage" class="coverage"></p>
+                <form id="period-form" class="period-form">
+                  <h2>Сводка периода</h2>
+                  <label>С<input id="from" type="date" required /></label
+                  ><label>По<input id="through" type="date" required /></label>
+                  <button type="submit">Рассчитать</button>
+                </form>
+                <dl id="period-stats" class="period-stats"></dl>
+                <button id="export-period" class="text-button">
+                  Скачать период
+                </button>
+                <details id="import-details">
+                  <summary>Диагностика выгрузки</summary>
+                  <div id="import-issues"></div>
+                </details>
+              </aside>
+              <section class="day-area">
+                <div class="day-heading">
+                  <div>
+                    <h1 id="day-title"></h1>
+                    <p id="day-time"></p>
+                  </div>
+                  <div class="day-actions">
+                    <button id="zoom-reset">Сбросить масштаб</button
+                    ><button id="export-day">Скачать день</button>
+                  </div>
+                </div>
+                <div id="version-wrap" hidden>
+                  <label>Версия записи<select id="version"></select></label>
+                  <p>Дата исключена из сводки периода из-за разных версий.</p>
+                </div>
+                <dl id="day-stats" class="day-stats"></dl>
+                <div id="event-counts" class="event-counts"></div>
+                <details id="source-details" hidden>
+                  <summary>Файлы этой даты</summary>
+                  <ul id="day-sources"></ul>
+                </details>
+                <details id="day-details">
+                  <summary>Особенности записи</summary>
+                  <div id="day-issues"></div>
+                </details>
+                <details id="interpretation-details" hidden>
+                  <summary>Основания трактовки полей и событий</summary>
+                  <p>
+                    C — косвенное свидетельство в ПО; H — гипотеза; U — смысл
+                    неизвестен; S — структура; V — официальная сверка. Сочетание
+                    C+H сохраняет оба основания.
+                  </p>
+                  <ul id="interpretations"></ul>
+                </details>
+                <div class="view-switch">
+                  <button id="chart-view" aria-pressed="true">Графики</button
+                  ><button id="table-view" aria-pressed="false">
+                    Исходные точки</button
+                  ><span>Время аппарата · сутки с 09:00</span>
+                </div>
+                <div id="charts-wrap">
+                  <div
+                    id="charts"
+                    aria-label="Графики давления, каналов и событий"
+                  ></div>
+                </div>
+                <section id="table-wrap" hidden>
+                  <p id="table-evidence"></p>
+                  <label
+                    >Ряд<select id="table-series">
+                      <option value="pressure">Давление</option>
+                      <option value="channel_1">Предполагаемая утечка</option>
+                      <option value="channel_2">
+                        Предполагаемый дыхательный объём
+                      </option>
+                      <option value="channel_3">
+                        Предполагаемая минутная вентиляция
+                      </option>
+                      <option value="channel_4">
+                        Предполагаемая частота дыхания
+                      </option>
+                      <option value="channel_5">Пятый канал</option>
+                      <option value="events">События</option>
+                    </select></label
+                  >
+                  <div class="table-scroll">
+                    <table>
+                      <thead id="table-head"></thead>
+                      <tbody id="table-body"></tbody>
+                    </table>
+                  </div>
+                </section>
+              </section>
+            </div>
+          </details>
+        </div>
+        <dialog id="export-dialog">
+          <form method="dialog">
+            <h2 id="export-title">Скачать данные</h2>
+            <p>
+              JSON содержит подробные данные и сводку. CSV скачивается архивом с
+              восемью таблицами.
+            </p>
+            <div class="export-actions">
+              <button type="button" id="download-json">JSON</button
+              ><button type="button" id="download-csv">CSV.zip</button
+              ><button value="cancel">Закрыть</button>
+            </div>
+          </form>
+        </dialog>
+      </main>
+      <footer>
+        HEALDATA ·
+        <a
+          href="https://github.com/IvanSaratov/micommed-reader"
+          target="_blank"
+          rel="noreferrer"
+          >Исходный код и описание формата</a
+        >
+      </footer>
+    </div>
+    <script type="module" src="/src/main.ts"></script>
+  </body>
+</html>

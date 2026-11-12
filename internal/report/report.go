@@ -1,4 +1,4 @@
-package cli
+package report
 
 import (
 	"bytes"
@@ -14,12 +14,12 @@ import (
 	hd "github.com/IvanSaratov/micommed-reader"
 )
 
-type report struct {
+type Report struct {
 	id                                     string
 	records                                []record
 	days                                   []*hd.Day
 	period                                 hd.PeriodSummary
-	diagnostics                            []problem
+	diagnostics                            []Problem
 	service, broken, duplicates, conflicts int
 	partial                                bool
 	profile, version                       string
@@ -35,8 +35,8 @@ func clockText(t hd.DeviceTime) string {
 	return fmt.Sprintf("%sT%02d:%02d:%02d", dateText(t.Date), t.Hour, t.Minute, t.Second)
 }
 
-func makeReport(in *input, from, to string) (*report, error) {
-	r := &report{id: in.id, version: hd.DecoderVersion, service: in.services, diagnostics: []problem{}}
+func Build(in *Input, from, to string) (*Report, error) {
+	r := &Report{id: in.id, version: hd.DecoderVersion, service: in.services, diagnostics: []Problem{}}
 	slices.SortStableFunc(in.records, func(a, b record) int {
 		if d := cmp.Compare(a.date, b.date); d != 0 {
 			return d
@@ -109,11 +109,11 @@ func makeReport(in *input, from, to string) (*report, error) {
 	}
 	for _, dup := range r.period.Duplicates {
 		r.duplicates += len(dup.Entries) - 1
-		r.diagnostics = append(r.diagnostics, problem{Kind: "duplicate", Code: string(dup.Reason), Date: dateText(dup.Date), Label: dup.Entries[0].Source.Label})
+		r.diagnostics = append(r.diagnostics, Problem{Kind: "duplicate", Code: string(dup.Reason), Date: dateText(dup.Date), Label: dup.Entries[0].Source.Label})
 	}
 	r.conflicts = len(r.period.Conflicts)
 	for _, ex := range r.period.Exclusions {
-		r.diagnostics = append(r.diagnostics, problem{Kind: "exclusion", Code: string(ex.Reason), Date: dateText(ex.Date), Detail: "дата исключена из сводки"})
+		r.diagnostics = append(r.diagnostics, Problem{Kind: "exclusion", Code: string(ex.Reason), Date: dateText(ex.Date), Detail: "дата исключена из сводки"})
 	}
 	// Ядро видит только декодированные дни. Повреждённый файл уже имеет свою причину
 	// в диагностике, поэтому исключаем его дату из интервалов отсутствующих файлов.
@@ -124,7 +124,7 @@ func makeReport(in *input, from, to string) (*report, error) {
 			if !damaged[d] || d < start || d > end {
 				continue
 			}
-			t, _ := parseDate(d)
+			t, _ := ParseDate(d)
 			if start < d {
 				r.addGap(start, t.AddDate(0, 0, -1).Format(time.DateOnly))
 			}
@@ -141,8 +141,8 @@ func makeReport(in *input, from, to string) (*report, error) {
 	r.partial = r.broken > 0 || len(r.period.Exclusions) > 0
 	return r, nil
 }
-func (r *report) addGap(from, to string) {
-	r.diagnostics = append(r.diagnostics, problem{Kind: "gap", Code: "missing_dates", Date: from, Through: to})
+func (r *Report) addGap(from, to string) {
+	r.diagnostics = append(r.diagnostics, Problem{Kind: "gap", Code: "missing_dates", Date: from, Through: to})
 }
 func metricText(m hd.Metric) string {
 	if !m.Valid {
@@ -151,7 +151,7 @@ func metricText(m hd.Metric) string {
 	return strconv.FormatFloat(m.Value, 'f', -1, 64)
 }
 
-func (r *report) writeText(w io.Writer, cmd string) error {
+func (r *Report) WriteText(w io.Writer, cmd string) error {
 	var b bytes.Buffer
 	switch cmd {
 	case "inspect":

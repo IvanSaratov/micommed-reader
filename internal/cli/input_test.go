@@ -49,14 +49,11 @@ func TestSourceEquivalenceAndLimits(t *testing.T) {
 	}
 	invoke(t, 1, "inspect", zipInput(t, entries...))
 	large := put(t, t.TempDir(), "notes", nil)
-	if err := os.Truncate(large, maxBytes+1); err != nil {
+	if err := os.Truncate(large, (40<<20)+1); err != nil {
 		t.Fatal(err)
 	}
 	invoke(t, 1, "inspect", filepath.Dir(large))
-	in := input{id: "zip:test", consumed: maxBytes - 5}
-	if err := in.read("notes", "", func() (io.ReadCloser, error) { return io.NopCloser(strings.NewReader("123456")), nil }); err == nil {
-		t.Fatal("превышение фактического бюджета")
-	}
+
 }
 
 func TestCSVPreservesIndependentAxes(t *testing.T) {

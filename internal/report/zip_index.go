@@ -1,4 +1,4 @@
-package cli
+package report
 
 import (
 	"archive/zip"
@@ -58,8 +58,8 @@ func checkZipIndex(r io.ReaderAt, size int64) error {
 			}
 		}
 	}
-	if count > maxEntries || length > maxBytes {
-		return containerLimit()
+	if count > MaxEntries || length > MaxBytes {
+		return LimitError()
 	}
 	if length > uint64(endPos) || offset > uint64(size) {
 		return zip.ErrFormat
@@ -85,8 +85,8 @@ func countZipHeaders(r io.ReaderAt, size, start int64) error {
 		if string(h[:4]) != "PK\x01\x02" {
 			break
 		}
-		if n >= maxEntries {
-			return containerLimit()
+		if n >= MaxEntries {
+			return LimitError()
 		}
 		le := binary.LittleEndian
 		extent := int64(headerSize) + int64(le.Uint16(h[28:])) + int64(le.Uint16(h[30:])) + int64(le.Uint16(h[32:]))
@@ -94,8 +94,8 @@ func countZipHeaders(r io.ReaderAt, size, start int64) error {
 			return zip.ErrFormat
 		}
 		pos += extent
-		if pos-start > maxBytes {
-			return containerLimit()
+		if pos-start > MaxBytes {
+			return LimitError()
 		}
 	}
 	return nil

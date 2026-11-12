@@ -6,8 +6,8 @@ import (
 	"fmt"
 	"io"
 	"strings"
-	"time"
 
+	shared "github.com/IvanSaratov/micommed-reader/internal/report"
 	urfave "github.com/urfave/cli/v3"
 )
 
@@ -95,7 +95,7 @@ func execute(ctx context.Context, c *urfave.Command) error {
 	}
 	for _, flag := range []string{"date", "from", "to"} {
 		if c.IsSet(flag) {
-			if _, err := parseDate(c.String(flag)); err != nil {
+			if _, err := shared.ParseDate(c.String(flag)); err != nil {
 				return usage("некорректная дата --%s %q, ожидается YYYY-MM-DD", flag, c.String(flag))
 			}
 		}
@@ -112,7 +112,7 @@ func execute(ctx context.Context, c *urfave.Command) error {
 	if err != nil {
 		return err
 	}
-	report, err := makeReport(input, from, to)
+	report, err := shared.Build(input, from, to)
 	if err != nil {
 		return err
 	}
@@ -120,26 +120,18 @@ func execute(ctx context.Context, c *urfave.Command) error {
 	stdout := c.Root().Writer
 	switch name {
 	case "inspect", "summary":
-		err = report.writeText(stdout, name)
+		err = report.WriteText(stdout, name)
 	case "json":
 		if out == "" {
-			err = report.writeJSON(stdout)
+			err = report.WriteJSON(stdout)
 		} else {
-			err = publishJSON(out, report.writeJSON)
+			err = publishJSON(out, report.WriteJSON)
 		}
 	case "csv":
-		err = report.writeCSV(out)
+		err = writeCSV(out, report)
 	}
-	if err == nil && report.partial {
+	if err == nil && report.Partial() {
 		return errPartial
 	}
 	return err
-}
-
-func parseDate(s string) (time.Time, error) {
-	t, err := time.Parse(time.DateOnly, s)
-	if err == nil && t.Year() == 0 {
-		err = errors.New("недопустимый год")
-	}
-	return t, err
 }

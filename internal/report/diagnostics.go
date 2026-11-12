@@ -1,4 +1,4 @@
-package cli
+package report
 
 import "fmt"
 
@@ -33,7 +33,7 @@ func reasonText(code string) string {
 	}
 	return code
 }
-func describeProblem(p problem) string {
+func describeProblem(p Problem) string {
 	s := fmt.Sprintf("%s (%s)", reasonText(p.Code), p.Code)
 	if p.Field != "" {
 		s += " " + string(p.Field)

@@ -9,6 +9,8 @@ import (
 	"strings"
 	"sync"
 	"testing"
+
+	shared "github.com/IvanSaratov/micommed-reader/internal/report"
 )
 
 func TestInputFailureContracts(t *testing.T) {
@@ -44,12 +46,12 @@ func TestCSVDirectoryPublication(t *testing.T) {
 	file := put(t, t.TempDir(), "20010203", fixture(t, "clock"))
 	dest := filepath.Join(t.TempDir(), "tables")
 	invoke(t, 0, "export", "csv", "-o", dest+string(os.PathSeparator), file)
-	r := report{}
+	r := shared.Report{}
 	dest = filepath.Join(t.TempDir(), "concurrent")
 	var wg sync.WaitGroup
 	outcomes := make(chan error, 8)
 	for range 8 {
-		wg.Go(func() { outcomes <- r.writeCSV(dest) })
+		wg.Go(func() { outcomes <- writeCSV(dest, &r) })
 	}
 	wg.Wait()
 	close(outcomes)
