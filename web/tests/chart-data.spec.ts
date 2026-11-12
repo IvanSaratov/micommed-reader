@@ -49,5 +49,8 @@ test("tooltip never borrows a neighbouring sample from another channel", () => {
   } as unknown as Day;
   expect(tooltipText(day, 10)).toContain("111");
   expect(tooltipText(day, 10)).not.toContain("222");
-  expect(tooltipText(day, 12)).toContain("Нет отсчёта");
+  expect(tooltipText(day, 12)).toBe("");
+  expect(tooltipText(day, 12, true)).toBe("");
+  // Скрытые дополнительные каналы не должны создавать пустую подсказку в сводке.
+  expect(tooltipText(day, 10, true, { channels: false })).toBe("");
 });

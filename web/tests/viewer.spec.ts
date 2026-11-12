@@ -111,9 +111,7 @@ test("single renamed file, clock, repeated minute, unknown event, keyboard and r
     box.x + 48 + ((box.width - 60) * 1000) / 1439,
     box.y + 90,
   );
-  await expect(
-    page.getByText("Нет отсчёта на этой минуте", { exact: false }),
-  ).toBeVisible();
+  await expect(page.locator("#charts [role=tooltip]")).toBeHidden();
   await page.mouse.move(
     Math.ceil(box.x + 48 + ((box.width - 60) * 900) / 1439),
     box.y + 90,
@@ -121,6 +119,11 @@ test("single renamed file, clock, repeated minute, unknown event, keyboard and r
   await expect(
     page.getByText("Событие #1 · 238", { exact: false }),
   ).toBeVisible();
+  await page.mouse.move(
+    box.x + 48 + ((box.width - 60) * 1000) / 1439,
+    box.y + 90,
+  );
+  await expect(page.locator("#charts [role=tooltip]")).toBeHidden();
   await page.locator("#zoom-reset").click();
   const doc = JSON.parse((await download(page, "day", "json")).toString());
   expect(doc.days[0].events.map((e: { code: number }) => e.code)).toEqual([

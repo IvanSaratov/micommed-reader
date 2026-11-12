@@ -94,6 +94,9 @@ export function tooltipText(
         : `Событие #${e.source_index ?? e.index} · ${e.code} · ${e.label || "неизвестный код"} (${e.meaning_evidence || "U"})`,
     );
   }
+  // Линия соединяет измерения, но не создаёт новых значений между ними.
+  // Если в выбранной минуте нечего показать, подсказка остаётся скрытой.
+  if (!lines.length) return "";
   const sample =
     pressure[0] ||
     day.channels.flatMap((c) => c.points).find((p) => p.minute === minute) ||
@@ -106,11 +109,7 @@ export function tooltipText(
           .slice(0, 19)
           .replace("T", " ")
       : `Минута ${minute} · ${minuteLabel(minute)}`);
-  return (
-    stamp +
-    "\n" +
-    (lines.length ? lines.join("\n") : "Нет отсчёта на этой минуте")
-  );
+  return stamp + "\n" + lines.join("\n");
 }
 export class DayCharts {
   private chart: echarts.ECharts;
@@ -149,7 +148,8 @@ export class DayCharts {
         origin: this.origin,
         channels: !this.overview,
       });
-      this.tooltip.hidden = false;
+      this.tooltip.hidden = !this.tooltip.textContent;
+      if (this.tooltip.hidden) return;
       this.tooltip.style.left =
         Math.max(
           0,
@@ -226,17 +226,30 @@ export class DayCharts {
     const series: NonNullable<EChartsOption["series"]> = [
       ...[0, 1].map((axis) => ({
         name: "Ряд " + (axis + 1),
-        type: "scatter" as const,
+        type: "line" as const,
         xAxisIndex: 0,
         yAxisIndex: 0,
         symbol: axis ? "diamond" : "circle",
         symbolSize: axis ? 6 : 5,
+        showSymbol: true,
+        connectNulls: false,
+        smooth: false,
+        lineStyle: { width: 1.4 },
         itemStyle: { color: colors[axis] },
-        data: day.pressure.map((p) => [
-          p.minute,
-          (axis ? p.second_raw : p.first_raw) * day.pressure_fields[axis].scale,
-          p.index,
-        ]),
+        data: channelData(
+          day.pressure.map((p) => ({
+            ...p,
+            raw: axis ? p.second_raw : p.first_raw,
+          })),
+          new Set(
+            day.diagnostics
+              .filter(
+                (d) => d.field === "pressure_1" && d.code === "time_reversal",
+              )
+              .map((d) => d.index!),
+          ),
+          day.pressure_fields[axis].scale,
+        ),
       })),
       ...(options.overview
         ? []
