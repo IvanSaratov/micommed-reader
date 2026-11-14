@@ -1,29 +1,12 @@
 import { test, expect, type Page } from "@playwright/test";
-import {
-  readFileSync,
-  writeFileSync,
-  mkdtempSync,
-  readdirSync,
-  rmSync,
-} from "node:fs";
-import { execFileSync, spawnSync } from "node:child_process";
-import { tmpdir } from "node:os";
+import { readFileSync } from "node:fs";
 import { resolve, join } from "node:path";
-import { zipSync, unzipSync } from "fflate";
+import { zipSync } from "fflate";
 
-// Только искусственные записи из публичных fixtures; личные выгрузки здесь не нужны.
+// Только искусственные записи из публичных fixtures.
 const root = resolve(import.meta.dirname, "../..");
 const fixture = (name: string) =>
   readFileSync(join(root, "research/fixtures", name + ".bin"));
-let temp: string;
-let cli: string;
-test.beforeAll(() => {
-  temp = mkdtempSync(join(tmpdir(), "healdata-browser-"));
-  cli = join(temp, "healdata");
-  execFileSync("go", ["build", "-o", cli, "./cmd/healdata"], { cwd: root });
-});
-test.afterAll(() => rmSync(temp, { recursive: true, force: true }));
-
 const file = (name: string, buffer: Buffer) => ({
   name,
   mimeType: "application/octet-stream",
@@ -31,13 +14,7 @@ const file = (name: string, buffer: Buffer) => ({
 });
 const archive = (entries: Record<string, Uint8Array>) =>
   Buffer.from(zipSync(entries));
-async function open(
-  page: Page,
-  name: string,
-  bytes: Buffer,
-  date?: string,
-  technical = true,
-) {
+async function open(page: Page, name: string, bytes: Buffer, date?: string) {
   await page.locator("#files").setInputFiles(file(name, bytes));
   if (date) {
     await page.locator("#file-date").fill(date);
@@ -47,171 +24,74 @@ async function open(
   }
   await expect(page.locator("#workspace")).toBeVisible();
   await expect(page.locator("#loading")).toBeHidden();
-  if (technical) await page.locator("#technical > summary").click();
-}
-async function download(
-  page: Page,
-  scope: "day" | "period",
-  format: "json" | "csv",
-) {
-  await page.locator("#export-" + scope).click();
-  const download = page.waitForEvent("download");
-  await page.locator("#download-" + format).click();
-  const path = await (await download).path();
-  return readFileSync(path!);
-}
-function native(bytes: Buffer, from?: string, through?: string) {
-  const source = join(temp, "input.zip");
-  writeFileSync(source, bytes);
-  const args = [
-    "export",
-    "json",
-    ...(from ? ["--from", from, "--to", through!] : []),
-    source,
-  ];
-  const result = spawnSync(cli, args, { encoding: "utf8" });
-  expect([0, 3]).toContain(result.status);
-  return { doc: JSON.parse(result.stdout), source };
 }
 test.beforeEach(async ({ page }) => {
   await page.goto("/");
 });
 
-test("single renamed file, clock, repeated minute, unknown event, keyboard and reset", async ({
+test("renamed file opens sessions without a technical panel and clears on close", async ({
   page,
 }) => {
   const failures: string[] = [];
   page.on("pageerror", (e) => failures.push(e.message));
-  await open(page, "clock.bin", fixture("clock"), "2001-02-03");
-  await expect(page.locator("#day-stats")).toContainText("30");
-  await expect(page.locator("#day-stats dd").nth(1)).toHaveText(
-    "2событий в час",
+  await open(
+    page,
+    "night.bin",
+    sessionFixture(25, [840, 845, 850, 855]),
+    "2001-02-25",
   );
-  await expect(page.locator("#day-stats dd").nth(2)).toHaveText(
-    "2событий в час",
-  );
-  await expect(page.locator("#event-counts")).toContainText("238");
-  await page.locator("#table-view").focus();
+  await expect(page.locator("#sleep-time")).toHaveText("23:00 — 23:15");
+  await expect(page.locator("#technical")).toHaveCount(0);
+  await expect(page.locator("#session-charts canvas")).toBeVisible();
+  await page.locator("#close-session").focus();
   await page.keyboard.press("Enter");
-  await expect(page.locator("#table-body tr")).toHaveCount(5);
-  const rows = page
-    .locator("#table-body tr")
-    .filter({ hasText: "2001-02-04 00:00:00" });
-  await expect(rows).toHaveCount(2);
-  await expect(rows.first()).toContainText("103");
-  await expect(rows.last()).toContainText("104");
-  await page.locator("#table-series").selectOption("events");
-  await expect(page.locator("#table-body tr")).toHaveCount(3);
-  await expect(page.locator("#table-body tr").nth(1)).toContainText("238");
-  await page.locator("#chart-view").click();
-  await expect(page.locator("#charts canvas")).toBeVisible();
-  await page.locator("#charts").scrollIntoViewIfNeeded();
-  const box = (await page.locator("#charts").boundingBox())!;
-  await page.mouse.move(
-    box.x + 48 + ((box.width - 60) * 1000) / 1439,
-    box.y + 90,
-  );
-  await expect(page.locator("#charts [role=tooltip]")).toBeHidden();
-  await page.mouse.move(
-    Math.ceil(box.x + 48 + ((box.width - 60) * 900) / 1439),
-    box.y + 90,
-  );
-  await expect(
-    page.getByText("Событие #1 · 238", { exact: false }),
-  ).toBeVisible();
-  await page.mouse.move(
-    box.x + 48 + ((box.width - 60) * 1000) / 1439,
-    box.y + 90,
-  );
-  await expect(page.locator("#charts [role=tooltip]")).toBeHidden();
-  await page.locator("#zoom-reset").click();
-  const doc = JSON.parse((await download(page, "day", "json")).toString());
-  expect(doc.days[0].events.map((e: { code: number }) => e.code)).toEqual([
-    102, 238, 101,
-  ]);
+  await expect(page.locator("#empty")).toBeVisible();
+  await expect(page.locator("#sleep-stats")).toBeEmpty();
   expect(failures).toEqual([]);
 });
 
-test("ZIP duplicates, inclusive period, exact CLI JSON/CSV parity and no data requests", async ({
+test("ZIP duplicates do not add sessions and open data causes no network requests", async ({
   page,
   context,
 }) => {
-  const bytes = archive({
-    "HealData/20010203": fixture("clock"),
-    "copy/20010203": fixture("clock"),
-    "HealData/20010204": fixture("next-day"),
-  });
-  const { doc, source } = native(bytes);
-  await open(page, "records.zip", bytes);
-  await expect(page.locator("#period-stats")).toContainText("31");
-  expect(doc.period.recalculated_ahi.value).toBeCloseTo(60 / 31);
-  const requests: string[] = [];
-  context.on("request", (r) => {
-    if (!r.url().startsWith("blob:")) requests.push(r.url());
-  });
-  const browser = JSON.parse(
-    (await download(page, "period", "json")).toString(),
+  await open(page, "20010203", fixture("clock"));
+  const count = await page.locator("#sleep-select option").count();
+  expect(count).toBeGreaterThan(0);
+  await open(
+    page,
+    "records.zip",
+    archive({
+      "20010203": fixture("clock"),
+      "copy/20010203": fixture("clock"),
+    }),
   );
-  expect(browser).toEqual(doc);
-  const tables = unzipSync(await download(page, "period", "csv"));
-  const csvDir = join(temp, "csv-" + Date.now());
-  const run = spawnSync(cli, ["export", "csv", "--out", csvDir, source], {
-    encoding: "utf8",
-  });
-  expect([0, 3]).toContain(run.status);
-  expect(Object.keys(tables).sort()).toEqual(readdirSync(csvDir).sort());
-  for (const name of Object.keys(tables))
-    expect(Buffer.from(tables[name])).toEqual(readFileSync(join(csvDir, name)));
-  await page.locator("#from").fill("2001-02-03");
-  await page.locator("#through").fill("2001-02-03");
-  await page.getByRole("button", { name: "Рассчитать", exact: true }).click();
-  await expect(page.locator("#period-stats")).toContainText("30");
-  expect(
-    JSON.parse((await download(page, "period", "json")).toString()),
-  ).toEqual(native(bytes, "2001-02-03", "2001-02-03").doc);
-  await page.locator("#from").fill("2001-03-01");
-  await page.locator("#through").fill("2001-03-02");
-  await page.getByRole("button", { name: "Рассчитать", exact: true }).click();
-  await expect(page.locator("#period-stats dd").first()).toHaveText("0");
-  const empty = JSON.parse((await download(page, "period", "json")).toString());
-  expect(empty.days).toEqual([]);
-  expect(empty.period.recalculated_ahi.value).toBeNull();
+  await expect(page.locator("#sleep-select option")).toHaveCount(count);
+  const requests: string[] = [];
+  context.on("request", (r) => requests.push(r.url()));
+  await page.locator("#session-prev").click();
+  await page.locator("#session-next").click();
+  await page.locator("#session-reset").click();
   expect(requests).toEqual([]);
 });
 
-test("conflict versions, unavailable stored metric and invalid record diagnostics", async ({
+test("conflicting and damaged records have a short explanation without details", async ({
   page,
 }) => {
-  const bytes = archive({
-    "a/20010203": fixture("clock"),
-    "b/20010203": fixture("minimum"),
-    "20010204": fixture("next-day"),
-  });
-  await open(page, "conflict.zip", bytes);
-  await expect(page.locator("#period-stats dd").first()).toHaveText("1");
-  await page.locator("#day-prev").click();
-  await expect(page.locator("#version-wrap")).toBeVisible();
-  await expect(page.locator("#version option")).toHaveCount(2);
-  await expect(page.locator("#day-stats dd").first()).toHaveText("30минут");
-  const first = await page.locator("#day-stats dd").first().textContent();
-  const second = await page
-    .locator("#version option")
-    .nth(1)
-    .getAttribute("value");
-  await page.locator("#version").selectOption(second!);
-  await expect(page.locator("#day-stats dd").first()).not.toHaveText(first!);
-  expect(JSON.parse((await download(page, "day", "json")).toString())).toEqual(
-    native(bytes, "2001-02-03", "2001-02-03").doc,
+  await open(
+    page,
+    "conflict.zip",
+    archive({
+      "a/20010203": fixture("clock"),
+      "b/20010203": fixture("minimum"),
+      "20010204": fixture("next-day"),
+    }),
   );
-  await open(page, "20010203", fixture("nan"));
-  await expect(page.locator("#day-stats dd").nth(1)).toContainText("—");
-  await expect(page.locator("#day-stats dd").nth(2)).toHaveText(
-    "2событий в час",
-  );
+  await expect(page.locator("#session-warning")).toContainText("разные версии");
+  await expect(page.locator("#sleep-result")).toBeVisible();
   await open(page, "broken.zip", archive({ "20010203": fixture("truncated") }));
-  await expect(page.locator("#day-time")).toContainText("повреждены");
-  await expect(page.locator("#day-issues")).not.toBeEmpty();
-  await expect(page.locator("#charts-wrap")).toBeHidden();
+  await expect(page.locator("#sleep-empty")).toBeVisible();
+  await expect(page.locator("#session-warning")).not.toBeEmpty();
+  await expect(page.locator("#sleep-result")).toBeHidden();
 });
 
 test("multiple files, drop, cancel and replacement, narrow screen", async ({
@@ -225,8 +105,7 @@ test("multiple files, drop, cancel and replacement, narrow screen", async ({
       file("20010204", fixture("next-day")),
     ]);
   await expect(page.locator("#loading")).toBeHidden();
-  await page.locator("#technical > summary").click();
-  await expect(page.locator("#period-stats")).toContainText("31");
+  await expect(page.locator("#sleep-select")).not.toBeEmpty();
   expect(
     await page.evaluate(
       () => document.documentElement.scrollWidth <= innerWidth,
@@ -239,9 +118,8 @@ test("multiple files, drop, cancel and replacement, narrow screen", async ({
     document.dispatchEvent(new DragEvent("drop", { dataTransfer }));
   }, payload);
   await expect(page.locator("#loading")).toBeHidden();
-  await page.locator("#technical > summary").click();
-  await expect(page.locator("#period-stats")).toContainText("30");
-  await page.locator("#close").click();
+  await expect(page.locator("#sleep-select")).not.toBeEmpty();
+  await page.locator("#close-session").click();
   await expect(page.locator("#empty")).toBeVisible();
   const big = archive(
     Object.fromEntries(
@@ -254,8 +132,8 @@ test("multiple files, drop, cancel and replacement, narrow screen", async ({
   await page.locator("#files").setInputFiles(file("large.zip", big));
   await page.locator("#cancel").click();
   await expect(page.locator("#empty")).toBeVisible();
-  await open(page, "20010203", fixture("minimum"));
-  await expect(page.locator("#day-stats dd").first()).toHaveText("1минут");
+  await open(page, "20010225", sessionFixture(25, [840, 850]));
+  await expect(page.locator("#sleep-time")).toHaveText("23:00 — 23:10");
   await expect(page.locator("#error")).toBeHidden();
 });
 
@@ -300,7 +178,7 @@ test("relative deployment path and readable startup failure", async ({
   });
   await page.goto("/viewer/");
   await open(page, "20010203", fixture("clock"));
-  await expect(page.locator("#day-stats dd").first()).toHaveText("30минут");
+  await expect(page.locator("#sleep-result")).toBeVisible();
   await context.route("**/wasm/healdata.wasm", (route) =>
     route.fulfill({ status: 503, body: "unavailable" }),
   );
@@ -336,9 +214,9 @@ test("maximum-size container keeps page responsive and preserves duplicates", as
   });
   const started = Date.now();
   await open(page, "large.zip", bytes);
-  await expect(page.locator("#coverage")).toContainText("4096");
-  await expect(page.locator("#period-stats dd").first()).toHaveText("1");
-  await expect(page.locator("#day-stats dd").first()).toHaveText("30минут");
+  // В искусственной записи два участка: 895–900 и 1439 минут.
+  await expect(page.locator("#sleep-select option")).toHaveCount(2);
+  await expect(page.locator("#sleep-result")).toBeVisible();
   expect(
     Number(await page.locator("body").getAttribute("data-ticks")),
   ).toBeGreaterThan(3);
@@ -352,41 +230,15 @@ test("maximum-size container keeps page responsive and preserves duplicates", as
   });
 });
 
-test("interpretation evidence remains visible in data views", async ({
+test("replacement with invalid dates clears the previous session", async ({
   page,
 }) => {
-  await open(page, "20010203", fixture("clock"));
-  await page.locator("#table-view").click();
-  await expect(page.locator("#table-evidence")).toContainText(
-    "Предполагаемое давление",
-  );
-  await expect(page.locator("#table-evidence")).toContainText("C+H");
-  await page.locator("#table-series").selectOption("events");
-  await expect(
-    page.locator("#table-body tr").first().locator("td").last(),
-  ).toHaveText("C");
-  await expect(
-    page.locator("#table-body tr").nth(1).locator("td").last(),
-  ).toHaveText("U");
-  await page.locator("#interpretation-details summary").click();
-  await expect(page.locator("#interpretation-details")).toContainText(
-    "H — гипотеза",
-  );
-});
-
-test("replacement with invalid dates clears all previous source details", async ({
-  page,
-}) => {
-  await open(page, "20010203", fixture("clock"));
-  await page.locator("#source-details summary").click();
-  await expect(page.locator("#day-sources")).toContainText("20010203");
+  await open(page, "20010225", sessionFixture(25, [840, 850]));
+  await expect(page.locator("#sleep-stats")).not.toBeEmpty();
   await open(page, "20010230", fixture("clock"));
-  await expect(page.locator("#day-title")).toHaveText(
-    "Записи требуют проверки",
-  );
-  await expect(page.locator("#source-details")).toBeHidden();
-  await expect(page.locator("#day-sources")).toBeEmpty();
-  await expect(page.locator("#table-body")).toBeEmpty();
+  await expect(page.locator("#sleep-empty")).toBeVisible();
+  await expect(page.locator("#sleep-stats")).toBeEmpty();
+  await expect(page.locator("#sleep-select")).toBeEmpty();
 });
 
 function sessionFixture(day: number, minutes: number[]) {
@@ -438,26 +290,18 @@ test("simple sleep session spans 09:00 and separates the next evening", async ({
     "20010225": sessionFixture(25, night),
     "20010226": sessionFixture(26, [0, 20, 40, 840, 870]),
   });
-  await open(page, "nights.zip", bytes, undefined, false);
-  await expect(page.locator("#technical")).not.toHaveAttribute("open", "");
-  await expect(page.locator("#source-name")).toBeHidden();
+  await open(page, "nights.zip", bytes);
+  await expect(page.locator("#technical")).toHaveCount(0);
   await expect(page.locator("#sleep-select option")).toHaveCount(2);
   await page.locator("#sleep-select").selectOption("0");
   await expect(page.locator("#sleep-time")).toHaveText("23:00 — 09:40");
   await expect(page.locator("#sleep-stats")).toContainText("10 ч 40 мин");
   await expect(page.locator("#sleep-stats dd").last()).toContainText("—");
   await expect(page.locator("#session-charts canvas")).toBeVisible();
-  await expect(page.locator("#session-charts")).toHaveCSS("height", "1235px");
-  await page.locator("#technical > summary").click();
-  await page.locator("#session-gap").fill("1");
-  await page.getByRole("button", { name: "Применить", exact: true }).click();
-  await expect
-    .poll(() => page.locator("#sleep-select option").count())
-    .toBeGreaterThan(2);
-  await page.locator("#session-gap").fill("60");
-  await page.getByRole("button", { name: "Применить", exact: true }).click();
-  await expect(page.locator("#sleep-select option")).toHaveCount(2);
-  await page.locator("#technical > summary").click();
+  await expect(
+    page.getByText("За этот сеанс аппарат не записал событий."),
+  ).toBeVisible();
+  await expect(page.locator(".event-track")).toHaveCount(0);
   await page.setViewportSize({ width: 390, height: 844 });
   await expect
     .poll(() =>
@@ -476,25 +320,195 @@ test("simple sleep session spans 09:00 and separates the next evening", async ({
   await expect(page.locator("#sleep-select")).toBeEmpty();
 });
 
-test("reopening details preserves the selected damaged record", async ({
+test("session hover stays on the active metric between samples and clears on zoom", async ({
   page,
 }) => {
-  await open(
-    page,
-    "mixed.zip",
-    archive({ "20010203": fixture("clock"), "20010204": fixture("truncated") }),
+  const raw = sessionFixture(25, [840, 845, 850, 855]);
+  raw.writeUInt16LE(70, 0x328);
+  [12, 14, 16, 18].forEach((value, i) => {
+    raw[0xf20 + i] = value;
+  });
+  await open(page, "20010225", raw);
+  const charts = page.locator("#session-charts");
+  const reading = charts.getByRole("tooltip", { includeHidden: true });
+  async function hover(axis: number, minute: number) {
+    await charts.evaluate(
+      (el, row) =>
+        window.scrollTo(
+          0,
+          el.getBoundingClientRect().top + scrollY + row * 360 - 40,
+        ),
+      axis,
+    );
+    // scroll обрабатывается перед наведением, как при завершённой прокрутке пользователем.
+    await page.evaluate(
+      () =>
+        new Promise<void>((resolve) =>
+          requestAnimationFrame(() => requestAnimationFrame(() => resolve())),
+        ),
+    );
+    const box = (await charts.boundingBox())!;
+    const point = {
+      x: box.x + 48 + ((box.width - 60) * minute) / 15,
+      y: box.y + axis * 360 + 112 + 108,
+    };
+    await page.mouse.move(point.x, point.y);
+    return point;
+  }
+  async function expectReading(time: string, values: string[], unit: string) {
+    await expect(reading.locator("time")).toHaveText(time);
+    await expect(reading.locator("strong")).toHaveText(values);
+    await expect(reading.locator("small")).toHaveText([unit]);
+  }
+  await hover(0, 1);
+  await expectReading("23:00", ["7"], "см вод. ст.");
+  await expect(reading).toBeVisible();
+  const position = (await reading.boundingBox())!;
+  await hover(0, 2);
+  await expect(reading).toBeVisible();
+  await expectReading("23:00", ["7"], "см вод. ст.");
+  await hover(0, 4);
+  await expectReading("23:05", ["7,1", "10,1"], "см вод. ст.");
+  expect((await reading.boundingBox())!.x).toBeGreaterThan(position.x + 50);
+  await hover(1, 4);
+  await expectReading("23:05", ["14"], "л/мин");
+  await page.keyboard.down("Shift");
+  await page.mouse.wheel(0, -400);
+  await page.keyboard.up("Shift");
+  await expect(reading).toBeHidden();
+  await page.locator("#session-reset").click();
+  await hover(0, 4);
+  await expectReading("23:05", ["7,1", "10,1"], "см вод. ст.");
+  await page.setViewportSize({ width: 390, height: 844 });
+  await expect
+    .poll(() =>
+      charts
+        .locator("canvas")
+        .evaluate((el: HTMLCanvasElement) => el.clientWidth),
+    )
+    .toBe(358);
+  await hover(1, 4);
+  await expectReading("23:05", ["14"], "л/мин");
+  const bounds = (await reading.boundingBox())!;
+  expect(bounds.height).toBeLessThan(70);
+  expect(bounds.x).toBeGreaterThanOrEqual(8);
+  expect(bounds.x + bounds.width).toBeLessThanOrEqual(382);
+  const edge = await hover(1, 14);
+  await expectReading("23:15", ["18"], "л/мин");
+  await expect(reading).toBeVisible();
+  const edgeBounds = (await reading.boundingBox())!;
+  expect(edgeBounds.x + edgeBounds.width).toBeLessThan(edge.x);
+  expect(edgeBounds.y + edgeBounds.height).toBeLessThanOrEqual(836);
+  await page.locator("#close-session").click();
+  await expect(reading).toBeHidden();
+  await expect(reading).toBeEmpty();
+});
+
+test("ordinary wheel scrolls the page while the pointer is over a graph", async ({
+  page,
+}) => {
+  const raw = sessionFixture(25, [840, 845, 850, 855]);
+  await open(page, "20010225", raw);
+  const charts = page.locator("#session-charts");
+  await charts.evaluate((el) =>
+    window.scrollTo(0, el.getBoundingClientRect().top + scrollY - 30),
   );
-  await page.locator("#day-next").click();
-  await expect(page.locator("#day-title")).toContainText("4 февраля");
-  await expect(page.locator("#day-time")).toContainText("повреждены");
-  await page.locator("#technical > summary").click();
-  await page.locator("#technical > summary").click();
-  await expect(page.locator("#day-title")).toContainText("4 февраля");
-  await expect(page.locator("#day-time")).toContainText("повреждены");
-  const doc = JSON.parse((await download(page, "day", "json")).toString());
-  expect(
-    doc.sources.every(
-      (source: { date: string }) => source.date === "2001-02-04",
-    ),
-  ).toBe(true);
+  const box = (await charts.boundingBox())!;
+  await page.mouse.move(box.x + 150, box.y + 112 + 108);
+  const before = await page.evaluate(() => scrollY);
+  await page.mouse.wheel(0, 350);
+  await expect
+    .poll(() => page.evaluate(() => scrollY))
+    .toBeGreaterThan(before + 200);
+  await expect(
+    charts.getByRole("tooltip", { includeHidden: true }),
+  ).toBeHidden();
+});
+
+test("event lanes retain repeat counts, definitions and the shared zoom across midnight", async ({
+  page,
+}) => {
+  await page.setViewportSize({ width: 390, height: 844 });
+  const raw = sessionFixture(25, [895, 900, 905, 910]);
+  const events = [
+    [895, 100],
+    [900, 104],
+    [900, 104],
+    [900, 238],
+    [910, 104],
+  ];
+  raw.writeUInt16LE(events.length, 0x968);
+  events.forEach(([minute, code], i) => {
+    raw[0x96a + i] = code;
+    raw.writeUInt16LE(minute, 0xa00 + i * 2);
+  });
+  raw.writeUInt16LE(3, 0xe0a);
+  await open(page, "20010225", raw);
+  const timeline = page.getByRole("region", { name: "Лента событий" });
+  const labels = timeline.locator("summary");
+  await expect(labels).toHaveText([
+    "Гипопноэ 3",
+    "Возможный храп 1",
+    "Неизвестное событие · код 238 1",
+  ]);
+  await expect(
+    page
+      .locator("#sleep-stats > div")
+      .filter({ hasText: "Апноэ и гипопноэ" })
+      .locator("dd"),
+  ).toContainText("3");
+  const definition = timeline.getByText(/Во время этого эпизода/);
+  await labels.first().focus();
+  await page.keyboard.press("Enter");
+  await expect(definition).toBeVisible();
+  await labels.first().click();
+  await expect(definition).toBeHidden();
+  const repeat = timeline.getByRole("button", { name: "00:00 · Гипопноэ × 2" });
+  const other = timeline.getByRole("button", {
+    name: "00:00 · Неизвестное событие · код 238",
+  });
+  const last = timeline.getByRole("button", { name: "00:10 · Гипопноэ" });
+  await expect(last).toBeVisible();
+  await repeat.click();
+  const tooltip = page.getByRole("tooltip");
+  await expect(tooltip).toHaveText("00:00 · Гипопноэ × 2");
+  await other.hover();
+  await expect(tooltip).toHaveText("00:00 · Неизвестное событие · код 238");
+  const x = (await repeat.boundingBox())!.x;
+  const chart = page.locator("#session-charts");
+  await chart.evaluate((el) =>
+    window.scrollTo(0, el.getBoundingClientRect().top + scrollY),
+  );
+  const box = (await chart.boundingBox())!;
+  await page.mouse.move(box.x + 48, box.y + 220);
+  await page.keyboard.down("Shift");
+  await page.mouse.wheel(0, -450);
+  await page.keyboard.up("Shift");
+  await expect(last).toBeHidden();
+  await expect
+    .poll(async () => (await repeat.boundingBox())?.x ?? 0)
+    .toBeGreaterThan(x + 1);
+  const fifth = chart.locator("summary").filter({ hasText: "Пятый канал" });
+  const fifthDescription = chart.getByText(/Дополнительный сигнал аппарата/);
+  await expect(fifthDescription).toHaveCount(0);
+  const zoomedX = (await repeat.boundingBox())!.x;
+  await fifth.focus();
+  await page.keyboard.press("Enter");
+  await expect(fifthDescription).toBeVisible();
+  await expect(last).toBeHidden();
+  expect((await repeat.boundingBox())!.x).toBeCloseTo(zoomedX, 0);
+  await fifth.click();
+  await expect(fifthDescription).toHaveCount(0);
+  await expect(last).toBeHidden();
+  await page.locator("#session-reset").click();
+  await expect(last).toBeVisible();
+  await repeat.click();
+  await expect(tooltip).toHaveText("00:00 · Гипопноэ × 2");
+  await page.keyboard.press("Escape");
+  await expect(tooltip).toBeHidden();
+  await open(page, "20010225", sessionFixture(25, [840, 845]));
+  await expect(
+    timeline.getByText("За этот сеанс аппарат не записал событий."),
+  ).toBeVisible();
+  await expect(labels).toHaveCount(0);
 });

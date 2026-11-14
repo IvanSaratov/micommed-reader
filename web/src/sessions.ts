@@ -36,21 +36,13 @@ export class SessionScreen {
   private charts?: DayCharts;
   private generation = 0;
   private detailRequest = 0;
+  private reasons: Record<string, string> = {};
   constructor() {
     el<HTMLSelectElement>("sleep-select").onchange = () =>
       void this.select(Number(el<HTMLSelectElement>("sleep-select").value));
     button("session-prev").onclick = () => this.move(-1);
     button("session-next").onclick = () => this.move(1);
     button("session-reset").onclick = () => this.charts?.reset();
-    el("session-settings").onsubmit = (e) => {
-      e.preventDefault();
-      void this.regroup(
-        Number(el<HTMLInputElement>("session-gap").value),
-      ).catch((error) => {
-        el("session-error").textContent = (error as Error).message;
-        visible("session-error", true);
-      });
-    };
   }
   clear() {
     this.generation++;
@@ -58,6 +50,7 @@ export class SessionScreen {
     this.reader = undefined;
     this.index = undefined;
     this.data = undefined;
+    this.reasons = {};
     this.charts?.clear();
     for (const id of [
       "sleep-select",
@@ -65,6 +58,7 @@ export class SessionScreen {
       "sleep-title",
       "sleep-time",
       "session-error",
+      "session-warning",
     ])
       el(id).replaceChildren();
     for (const id of [
@@ -74,12 +68,12 @@ export class SessionScreen {
       "session-error",
     ])
       visible(id, false);
-    el<HTMLInputElement>("session-gap").value = "60";
     for (const id of ["session-prev", "session-next"])
       button(id).disabled = true;
   }
-  async load(reader: Reader) {
+  async load(reader: Reader, reasons: Record<string, string>) {
     this.reader = reader;
+    this.reasons = reasons;
     await this.regroup(60);
   }
   private async regroup(gap: number) {
@@ -112,6 +106,17 @@ export class SessionScreen {
         select.append(option);
       }
       select.disabled = !index.sessions.length;
+      const reasons = [
+        ...new Set(
+          index.issues.map(
+            (issue) =>
+              this.reasons[issue.code] || "запись не удалось прочитать",
+          ),
+        ),
+      ];
+      el("session-warning").textContent = reasons.length
+        ? "Часть записей пропущена: " + reasons.join("; ") + "."
+        : "";
       visible("session-warning", index.issues.length > 0);
       visible("sleep-empty", index.sessions.length === 0);
       if (index.sessions.length) await this.select(index.sessions.at(-1)!.id);
@@ -155,7 +160,7 @@ export class SessionScreen {
         hours(s.span_minutes),
         "включая короткие перерывы",
       ],
-      ["Дыхательные события", String(count), "за этот сеанс"],
+      ["Апноэ и гипопноэ", String(count), "за этот сеанс"],
       [
         "AHI",
         s.recalculated_ahi.value === null

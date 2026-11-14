@@ -1,6 +1,35 @@
 import { test, expect } from "@playwright/test";
-import { channelData, minuteLabel, tooltipText } from "../src/charts";
+import {
+  channelData,
+  minuteLabel,
+  pressureLines,
+  tooltipText,
+} from "../src/charts";
 import type { Day } from "../src/types";
+
+test("pressure keeps both sides of a divergence but never overlays a shared segment or bridges a break", () => {
+  const data = {
+    pressure: [7, 7, 9, 7, 7, 8, 7].map((second_raw, index) => ({
+      index,
+      minute: index,
+      first_raw: 7,
+      second_raw,
+      break_before: index === 5,
+    })),
+    pressure_fields: [{ scale: 1 }, { scale: 1 }],
+    diagnostics: [],
+  } as unknown as Day;
+  expect(pressureLines(data)[1]).toEqual([
+    [1, 7, 1],
+    [2, 9, 2],
+    [3, 7, 3],
+    [5, null, -1],
+    [5, 8, 5],
+    [6, 7, 6],
+  ]);
+  data.pressure.forEach((p) => (p.second_raw = p.first_raw));
+  expect(pressureLines(data)).toHaveLength(1);
+});
 
 test("channel-specific gap and reversed time preserve raw order and repeated minutes", () => {
   const points = [
