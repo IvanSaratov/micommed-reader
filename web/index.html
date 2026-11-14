@@ -19,8 +19,10 @@
             >RC-C60</span
           ></a
         >
-        <span class="local-note">Обработка на этом устройстве</span>
-        <button id="open" class="primary">Открыть файлы</button>
+        <div class="file-actions">
+          <button id="close-session" hidden>Закрыть</button>
+          <button id="open" class="primary">Открыть файлы</button>
+        </div>
         <input
           id="files"
           type="file"
@@ -42,7 +44,6 @@
             <button id="choose" class="primary">Выбрать файл или ZIP</button>
             <p>или перетащите сюда дневные файлы</p>
           </div>
-          <p class="empty-foot">Запись остаётся в памяти этой вкладки.</p>
         </section>
         <section id="date-request" class="date-request" hidden>
           <h2>Дата отчётного дня</h2>
@@ -61,20 +62,60 @@
         <div id="error" class="error" role="alert" hidden></div>
         <div id="workspace" class="viewer" hidden>
           <section id="sleep-view" class="sleep-view" aria-label="Сеанс сна">
-            <div class="sleep-navigation">
-              <label>Сеанс сна<select id="sleep-select"></select></label>
-              <button id="session-prev" aria-label="Предыдущий сеанс">←</button>
-              <button id="session-next" aria-label="Следующий сеанс">→</button>
-              <button id="close-session" class="quiet">Закрыть</button>
-            </div>
             <p id="session-warning" class="session-warning" hidden></p>
             <p id="sleep-empty" hidden>
               Не удалось собрать сеансы. Выберите другие записи или ZIP.
             </p>
             <div id="sleep-result" hidden>
-              <h1 id="sleep-title"></h1>
-              <p id="sleep-time" class="sleep-time"></p>
-              <dl id="sleep-stats" class="day-stats"></dl>
+              <div class="session-panel">
+                <nav id="session-calendar" aria-label="Календарь записей">
+                  <div class="calendar-header">
+                    <h2 id="calendar-month" aria-live="polite"></h2>
+                    <button
+                      class="step prev"
+                      id="month-prev"
+                      aria-label="Предыдущий месяц с записями"
+                    ></button>
+                    <button
+                      class="step"
+                      id="month-next"
+                      aria-label="Следующий месяц с записями"
+                    ></button>
+                  </div>
+                  <div class="calendar-week" aria-hidden="true">
+                    <span>Пн</span><span>Вт</span><span>Ср</span><span>Чт</span
+                    ><span>Пт</span><span>Сб</span><span>Вс</span>
+                  </div>
+                  <div id="calendar-days" class="calendar-days"></div>
+                  <p class="calendar-key">Есть запись</p>
+                </nav>
+                <section class="session-summary" aria-labelledby="sleep-title">
+                  <div class="summary-heading">
+                    <h1 id="sleep-title"></h1>
+                    <div
+                      class="session-steps"
+                      aria-label="Выбор сеанса"
+                      role="group"
+                    >
+                      <button
+                        class="step prev"
+                        id="session-prev"
+                        aria-label="Предыдущий сеанс"
+                      ></button>
+                      <button
+                        class="step"
+                        id="session-next"
+                        aria-label="Следующий сеанс"
+                      ></button>
+                    </div>
+                  </div>
+                  <p id="sleep-time" class="sleep-time"></p>
+                  <label id="day-sessions" hidden
+                    >Сеанс за выбранный день<select id="sleep-select"></select
+                  ></label>
+                  <dl id="sleep-stats" class="day-stats"></dl>
+                </section>
+              </div>
               <div class="sleep-chart-actions">
                 <button id="session-reset">Весь сеанс</button>
               </div>

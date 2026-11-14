@@ -1,5 +1,6 @@
 import { Reader } from "./client";
 import { DayCharts } from "./charts";
+import { SessionCalendar } from "./session-calendar";
 import type { SessionIndex, SessionView, SleepSession } from "./types";
 
 const el = <T extends HTMLElement = HTMLElement>(id: string) =>
@@ -21,6 +22,11 @@ function dates(s: SleepSession) {
     new Date(s.end_device_time + "Z"),
   );
 }
+function times(s: SleepSession) {
+  return (
+    s.start_device_time.slice(11, 16) + " — " + s.end_device_time.slice(11, 16)
+  );
+}
 function hours(minutes: number) {
   const n = Math.round(minutes);
   if (!n) return "<1 мин";
@@ -34,12 +40,22 @@ export class SessionScreen {
   private index?: SessionIndex;
   private data?: SessionView;
   private charts?: DayCharts;
+  private selectedId?: number;
+  private selectedDay = "";
+  private calendar = new SessionCalendar((day, sessions) => {
+    const session =
+      sessions.find((s) => s.id === this.selectedId) || sessions.at(-1)!;
+    void this.select(session.id, day);
+  });
   private generation = 0;
   private detailRequest = 0;
   private reasons: Record<string, string> = {};
   constructor() {
     el<HTMLSelectElement>("sleep-select").onchange = () =>
-      void this.select(Number(el<HTMLSelectElement>("sleep-select").value));
+      void this.select(
+        Number(el<HTMLSelectElement>("sleep-select").value),
+        this.selectedDay,
+      );
     button("session-prev").onclick = () => this.move(-1);
     button("session-next").onclick = () => this.move(1);
     button("session-reset").onclick = () => this.charts?.reset();
@@ -49,6 +65,9 @@ export class SessionScreen {
     this.detailRequest++;
     this.reader = undefined;
     this.index = undefined;
+    this.selectedId = undefined;
+    this.selectedDay = "";
+    this.calendar.clear();
     this.data = undefined;
     this.reasons = {};
     this.charts?.clear();
@@ -63,6 +82,7 @@ export class SessionScreen {
       el(id).replaceChildren();
     for (const id of [
       "sleep-result",
+      "day-sessions",
       "sleep-empty",
       "session-warning",
       "session-error",
@@ -92,20 +112,7 @@ export class SessionScreen {
       const index = await this.reader.call<SessionIndex>("sessions", { gap });
       if (token !== this.generation) return;
       this.index = index;
-      const select = el<HTMLSelectElement>("sleep-select");
-      select.replaceChildren();
-      for (const s of index.sessions) {
-        const option = document.createElement("option");
-        option.value = String(s.id);
-        option.textContent =
-          dates(s) +
-          " · " +
-          s.start_device_time.slice(11, 16) +
-          " — " +
-          s.end_device_time.slice(11, 16);
-        select.append(option);
-      }
-      select.disabled = !index.sessions.length;
+      this.calendar.load(index.sessions);
       const reasons = [
         ...new Set(
           index.issues.map(
@@ -126,28 +133,35 @@ export class SessionScreen {
   }
   private move(offset: number) {
     const list = this.index?.sessions || [],
-      id = Number(el<HTMLSelectElement>("sleep-select").value);
+      id = this.selectedId;
     const i = list.findIndex((s) => s.id === id) + offset;
     if (list[i]) void this.select(list[i].id);
   }
-  private async select(id: number) {
+  private async select(id: number, day?: string) {
     if (!this.reader || !this.index) return;
     const s = this.index.sessions.find((s) => s.id === id);
     if (!s) return;
+    this.selectedDay = day ?? s.start_device_time.slice(0, 10);
+    const sessions = this.calendar.select(this.selectedDay);
+    const select = el<HTMLSelectElement>("sleep-select");
+    select.replaceChildren(
+      ...sessions.map((item) => new Option(times(item), String(item.id))),
+    );
+    select.value = String(id);
+    select.disabled = sessions.length < 2;
+    visible("day-sessions", sessions.length > 1);
+    if (this.selectedId === id && this.data) return;
+    this.selectedId = id;
     const version = this.generation,
       request = ++this.detailRequest;
     this.data = undefined;
     this.charts?.clear();
-    el<HTMLSelectElement>("sleep-select").value = String(id);
     const position = this.index.sessions.indexOf(s);
     button("session-prev").disabled = position === 0;
     button("session-next").disabled =
       position === this.index.sessions.length - 1;
     el("sleep-title").textContent = dates(s);
-    el("sleep-time").textContent =
-      s.start_device_time.slice(11, 16) +
-      " — " +
-      s.end_device_time.slice(11, 16);
+    el("sleep-time").textContent = times(s);
     const stats = el("sleep-stats");
     stats.replaceChildren();
     const count = ["102", "103", "104"].reduce(

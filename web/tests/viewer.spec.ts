@@ -282,6 +282,40 @@ function sessionFixture(day: number, minutes: number[]) {
   return raw;
 }
 
+test("calendar selects whole sessions across months and offers each session on a shared date", async ({
+  page,
+}) => {
+  const archiveBytes = archive({
+    "20010228": sessionFixture(28, [895, 900, 905, 1200, 1220]),
+  });
+  await open(page, "calendar.zip", archiveBytes);
+  const calendar = page.getByRole("navigation", { name: "Календарь записей" });
+  const day = (key: string) => calendar.locator(`button[data-date="${key}"]`);
+  await expect(day("2001-03-01")).toHaveAttribute("aria-pressed", "true");
+  await expect(day("2001-03-02")).toBeDisabled();
+  await expect(page.locator("#sleep-time")).toHaveText("05:00 — 05:20");
+  await expect(
+    page.getByLabel("Сеанс за выбранный день").locator("option"),
+  ).toHaveCount(2);
+  await page.getByLabel("Предыдущий месяц с записями").click();
+  await day("2001-02-28").focus();
+  await page.keyboard.press("Enter");
+  await expect(day("2001-02-28")).toBeFocused();
+  await expect(page.locator("#sleep-time")).toHaveText("23:55 — 00:05");
+  await expect(page.locator("#sleep-stats")).toContainText("10 мин");
+  await expect(page.locator("#day-sessions")).toBeHidden();
+  await page.getByLabel("Следующий месяц с записями").click();
+  await day("2001-03-01").click();
+  const picker = page.getByLabel("Сеанс за выбранный день");
+  await expect(picker).toHaveValue("0");
+  await picker.selectOption("1");
+  await expect(page.locator("#sleep-stats")).toContainText("20 мин");
+  await expect(page.locator("#sleep-time")).toHaveText("05:00 — 05:20");
+  await expect(day("2001-03-01")).toHaveAttribute("aria-pressed", "true");
+  await page.locator("#close-session").click();
+  await expect(calendar.locator("[data-date]")).toHaveCount(0);
+});
+
 test("simple sleep session spans 09:00 and separates the next evening", async ({
   page,
 }) => {

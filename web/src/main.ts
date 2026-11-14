@@ -31,7 +31,13 @@ function close() {
   pendingFiles = [];
   input("file-date").value = "";
   text("date-explanation", "");
-  for (const id of ["workspace", "loading", "date-request", "error"])
+  for (const id of [
+    "workspace",
+    "close-session",
+    "loading",
+    "date-request",
+    "error",
+  ])
     show(id, false);
   show("empty", true);
 }
@@ -81,6 +87,7 @@ async function openFiles(date: string) {
     if (session !== generation) return;
     pendingFiles = [];
     show("workspace", true);
+    show("close-session", true);
     await sleep.load(reader, result.reasons);
   } catch (e) {
     if (session !== generation) return;
@@ -89,6 +96,7 @@ async function openFiles(date: string) {
     pendingFiles = [];
     sleep.clear();
     show("workspace", false);
+    show("close-session", false);
     error((e as Error).message);
     show("empty", true);
   } finally {
