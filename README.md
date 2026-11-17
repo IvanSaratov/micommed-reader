@@ -7,13 +7,13 @@
 Для подключения к своему проекту потребуется Go 1.26 или новее.
 
 ```sh
-go get github.com/IvanSaratov/micommed-reader
+go get github.com/IvanSaratov/micommed-reader/pkg/healdata
 ```
 
 Передайте в `DecodeDay` содержимое одного дневного файла. Дату возьмите из его имени. Например, для файла `20010203`:
 
 ```go
-import healdata "github.com/IvanSaratov/micommed-reader"
+import "github.com/IvanSaratov/micommed-reader/pkg/healdata"
 
 func readDay(raw []byte) (*healdata.Day, error) {
 	return healdata.DecodeDay(raw, healdata.Source{
@@ -22,7 +22,7 @@ func readDay(raw []byte) (*healdata.Day, error) {
 }
 ```
 
-В `day.Pressure` и `day.Events` доступны измерения и события. Метод `day.Stats()` возвращает суточную сводку. Для нескольких файлов одного источника `GroupSessions(days, 60)` собирает сеансы с перерывами до 60 минут включительно. [Пример чтения файла](contract_test.go)
+В `day.Pressure` и `day.Events` доступны измерения и события. Метод `day.Stats()` возвращает суточную сводку. Для нескольких файлов одного источника `GroupSessions(days, 60)` собирает сеансы с перерывами до 60 минут включительно. [Пример чтения файла](pkg/healdata/contract_test.go)
 
 ## CLI
 

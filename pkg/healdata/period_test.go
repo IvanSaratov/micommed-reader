@@ -37,7 +37,7 @@ func TestPeriodWeightedCoverage(t *testing.T) {
 
 func TestPeriodFixturePair(t *testing.T) {
 	d1 := statsFixture(t, "clock")
-	raw, err := os.ReadFile("research/fixtures/next-day.bin")
+	raw, err := os.ReadFile("../../research/fixtures/next-day.bin")
 	if err != nil {
 		t.Fatal(err)
 	}

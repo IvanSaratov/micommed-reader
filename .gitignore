@@ -23,7 +23,7 @@ __pycache__/
 /research/prototype/
 /research/stage1/*
 !/research/stage1/make_fixtures.py
-/corpus_test.go
+/pkg/healdata/corpus_test.go
 /internal/cli/corpus_test.go
 
 # Выгрузки аппарата, отчёты и локальные сборки.

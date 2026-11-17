@@ -3,7 +3,7 @@ package report
 import (
 	"errors"
 	"fmt"
-	hd "github.com/IvanSaratov/micommed-reader"
+	hd "github.com/IvanSaratov/micommed-reader/pkg/healdata"
 	"time"
 )
 

@@ -7,7 +7,7 @@ import (
 	"slices"
 	"strconv"
 
-	hd "github.com/IvanSaratov/micommed-reader"
+	hd "github.com/IvanSaratov/micommed-reader/pkg/healdata"
 )
 
 // Указатель сохраняет различие между измеренным нулём и недоступным значением в обоих форматах.

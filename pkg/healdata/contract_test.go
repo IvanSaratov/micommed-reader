@@ -9,11 +9,11 @@ import (
 	"testing"
 	"time"
 
-	"github.com/IvanSaratov/micommed-reader"
+	"github.com/IvanSaratov/micommed-reader/pkg/healdata"
 )
 
 func TestPublicContract(t *testing.T) {
-	const dir = "research/fixtures"
+	const dir = "../../research/fixtures"
 	manifest, err := os.ReadFile(filepath.Join(dir, "expectations.json"))
 	if err != nil {
 		t.Fatal(err)
@@ -90,7 +90,7 @@ func TestPublicContract(t *testing.T) {
 }
 
 func ExampleDecodeDay() {
-	raw, err := os.ReadFile("research/fixtures/clock.bin")
+	raw, err := os.ReadFile("../../research/fixtures/clock.bin")
 	if err != nil {
 		panic(err)
 	}

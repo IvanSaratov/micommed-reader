@@ -11,7 +11,7 @@ import (
 	"strings"
 	"time"
 
-	hd "github.com/IvanSaratov/micommed-reader"
+	hd "github.com/IvanSaratov/micommed-reader/pkg/healdata"
 )
 
 type Report struct {

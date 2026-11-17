@@ -6,7 +6,7 @@ import (
 	"fmt"
 	"io"
 
-	hd "github.com/IvanSaratov/micommed-reader"
+	hd "github.com/IvanSaratov/micommed-reader/pkg/healdata"
 )
 
 // Index содержит только сведения для навигации. Ряды запрашиваются для одного дня.

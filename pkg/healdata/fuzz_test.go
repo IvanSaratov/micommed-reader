@@ -5,11 +5,11 @@ import (
 	"path/filepath"
 	"testing"
 
-	"github.com/IvanSaratov/micommed-reader"
+	"github.com/IvanSaratov/micommed-reader/pkg/healdata"
 )
 
 func FuzzDecodeDay(f *testing.F) {
-	seeds, err := filepath.Glob("research/fixtures/*.bin")
+	seeds, err := filepath.Glob("../../research/fixtures/*.bin")
 	if err != nil || len(seeds) == 0 {
 		f.Fatal("синтетические файлы недоступны", err)
 	}

@@ -8,7 +8,7 @@ import (
 
 func statsFixture(t *testing.T, name string) *Day {
 	t.Helper()
-	raw, err := os.ReadFile("research/fixtures/" + name + ".bin")
+	raw, err := os.ReadFile("../../research/fixtures/" + name + ".bin")
 	if err != nil {
 		t.Fatal(err)
 	}
